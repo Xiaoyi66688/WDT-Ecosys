@@ -5,6 +5,7 @@ import { Mail, ChevronDown, Check, Loader2 } from "lucide-react";
 import countryList from 'react-select-country-list';
 import { getCountryCallingCode } from 'libphonenumber-js';
 import axios from 'axios';
+import { createOrganization, JoinFormData } from "@/lib/xano-api";
 
 export default function JoinPage() {
   const [formData, setFormData] = useState({
@@ -50,6 +51,8 @@ export default function JoinPage() {
   const countryRef = useRef<HTMLDivElement>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const filteredCountries = countries.filter(c => 
     c.name.toLowerCase().includes(searchCountry.toLowerCase()) || 
@@ -130,15 +133,52 @@ export default function JoinPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      // =========================================================================
-      // 【同事注意 / FOR COLLEAGUE】
-      // 中文：表单验证已通过。你需要在这里编写将 formData 发送到 Airtable API 的逻辑。
-      // English: Form validation passed. You need to implement the logic here to send formData to Airtable API.
-      // =========================================================================
-      alert("Form submitted successfully!");
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+    setSubmitSuccess(false);
+
+    try {
+      // 準備提交到 Xano 的數據
+      const submitData: JoinFormData = {
+        orgName: formData.orgName,
+        orgDesc: formData.orgDesc,
+        contactPerson: formData.contactPerson,
+        role: formData.role,
+        website: formData.website,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        expertise: formData.expertise,
+        country: selectedCountry?.value,
+      };
+
+      await createOrganization(submitData);
+      
+      setSubmitSuccess(true);
+      
+      // 重置表單
+      setFormData({
+        orgName: "",
+        orgDesc: "",
+        contactPerson: "",
+        role: "",
+        website: "",
+        email: "",
+        phone: "",
+        address: "",
+        expertise: "",
+      });
+      
+      // 3 秒後隱藏成功訊息
+      setTimeout(() => setSubmitSuccess(false), 3000);
+    } catch (error: any) {
+      console.error('提交表單失敗:', error);
+      setErrors({ submit: error.message || '提交失敗，請稍後再試' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -333,9 +373,17 @@ export default function JoinPage() {
 
           <button 
             type="submit"
-            className="w-full bg-[#3B3469] text-white py-4 rounded-2xl font-bold hover:bg-[#2D2852] transition-all shadow-lg mt-8"
+            disabled={isSubmitting}
+            className="w-full bg-[#3B3469] text-white py-4 rounded-2xl font-bold hover:bg-[#2D2852] transition-all shadow-lg mt-8 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Submit
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                提交中...
+              </>
+            ) : (
+              'Submit'
+            )}
           </button>
         </form>
       </div>

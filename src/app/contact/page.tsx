@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Mail, ChevronDown, Check } from "lucide-react";
+import { Mail, ChevronDown, Check, Loader2 } from "lucide-react";
+import { submitContactForm, ContactFormData } from "@/lib/xano-api";
 
 const REASONS = [
   "General enquiry",
@@ -21,6 +22,8 @@ export default function ContactPage() {
 
   const [isReasonOpen, setIsReasonOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const reasonRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -47,16 +50,43 @@ export default function ContactPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      // =========================================================================
-      // 【同事注意 / FOR COLLEAGUE】
-      // 中文：联系表单验证已通过。你需要在这里编写发送邮件或将数据存入 Airtable 的逻辑。
-      // English: Contact form validation passed. You need to implement logic here to send an email or save data to Airtable.
-      // =========================================================================
-      alert("Message sent successfully!");
-      console.log(formData);
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+    setSubmitSuccess(false);
+    setErrors({});
+
+    try {
+      const submitData: ContactFormData = {
+        name: formData.name,
+        organisation: formData.organisation,
+        email: formData.email,
+        reason: formData.reason,
+        comments: formData.comments,
+      };
+
+      await submitContactForm(submitData);
+      
+      setSubmitSuccess(true);
+      
+      // 重置表單
+      setFormData({
+        name: "",
+        organisation: "",
+        email: "",
+        reason: "",
+        comments: "",
+      });
+      
+      // 3 秒後隱藏成功訊息
+      setTimeout(() => setSubmitSuccess(false), 3000);
+    } catch (error: any) {
+      console.error('提交聯繫表單失敗:', error);
+      setErrors({ submit: error.message || '提交失敗，請稍後再試' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -69,6 +99,24 @@ export default function ContactPage() {
             Fill in the form to get in contact with us.
           </p>
         </div>
+
+        {/* Success Message */}
+        {submitSuccess && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-2xl">
+            <p className="text-green-800 text-sm font-medium">
+              ✅ 訊息已成功發送！我們會盡快與您聯繫。
+            </p>
+          </div>
+        )}
+
+        {/* Submit Error Message */}
+        {errors.submit && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl">
+            <p className="text-red-800 text-sm font-medium">
+              ❌ {errors.submit}
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Your Name */}
@@ -154,9 +202,17 @@ export default function ContactPage() {
 
           <button 
             type="submit"
-            className="w-full bg-[#3B3469] text-white py-4 rounded-2xl font-bold hover:bg-[#2D2852] transition-all shadow-lg mt-8"
+            disabled={isSubmitting}
+            className="w-full bg-[#3B3469] text-white py-4 rounded-2xl font-bold hover:bg-[#2D2852] transition-all shadow-lg mt-8 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Get In Contact Now
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                發送中...
+              </>
+            ) : (
+              'Get In Contact Now'
+            )}
           </button>
         </form>
       </div>

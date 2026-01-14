@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, Check, ExternalLink, Mail, Phone, MapPin, X, Building2, Zap, Users } from "lucide-react";
+import { Search, ChevronDown, Check, ExternalLink, Mail, Phone, MapPin, X, Building2, Zap, Users, Loader2 } from "lucide-react";
+import { getOrganizations, Organization } from "@/lib/xano-api";
 
-// --- Mock Data Types ---
+// --- Data Types ---
 interface Org {
   id: string;
   name: string;
@@ -19,11 +20,7 @@ interface Org {
   impactArea: string[];
 }
 
-// =========================================================================
-// 【同事注意 / FOR COLLEAGUE】
-// 中文：这里是模拟数据。你需要将此处替换为从 Airtable API 获取的真实数据。
-// English: This is mock data. You need to replace this with real data fetched from Airtable API.
-// =========================================================================
+// 備用模擬數據（當 API 無法連接時使用）
 const MOCK_DATA: Org[] = [
   {
     id: "1",
@@ -79,26 +76,116 @@ const MOCK_DATA: Org[] = [
   }
 ];
 
-// =========================================================================
-// 【同事注意 / FOR COLLEAGUE】
-// 中文：这里是筛选器的选项。如果 Airtable 里的分类有变动，请同步更新此处，或改为从 API 动态获取。
-// English: These are filter options. If categories in Airtable change, please update here or fetch them dynamically via API.
-// =========================================================================
-const FILTER_OPTIONS = {
-  expertise: ["Accounting", "Advocacy", "Agriculture", "AgriTech", "AI", "Animation", "Arts organisation", "ISP", "Retail", "Telecommunications", "Web development", "SaaS"],
-  entityType: ["Community", "Connector/Enabler", "Corporate", "Council", "Education", "Energy"],
-  impactArea: ["Digital equity", "Digital inclusion", "Industry pathway", "Internship pathway", "Pastoral care"]
-};
 
 export default function DatabasePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedExpertise, setSelectedExpertise] = useState<string[]>([]);
   const [selectedEntityType, setSelectedEntityType] = useState<string[]>([]);
   const [selectedImpactArea, setSelectedImpactArea] = useState<string[]>([]);
+  const [organizations, setOrganizations] = useState<Org[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 從 Xano API 獲取數據
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await getOrganizations();
+        console.log('從 Xano 獲取的原始數據:', data);
+        console.log('數據數量:', data.length);
+        
+        // 將 Xano 數據轉換為前端需要的格式
+        // 支持 Xano 資料庫的下劃線字段名稱和前端期望的駝峰字段名稱
+        const formattedData: Org[] = data.map((org: any) => {
+          // 處理 expertise（可能是字符串，需要轉換為數組）
+          const expertise = org.expertise || '';
+          const expertiseArray = Array.isArray(expertise) 
+            ? expertise 
+            : (typeof expertise === 'string' && expertise.trim() 
+                ? expertise.split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0)
+                : []);
+          
+          // 處理 impactArea（可能是字符串，需要轉換為數組）
+          // 支持多個字段：impact_area, other_impact_areas, pastoral_care, industry_pathway, internship_pathway
+          const impactAreaSources = [
+            org.impact_area,
+            org.other_impact_areas,
+            org.pastoral_care,
+            org.industry_pathway,
+            org.internship_pathway
+          ].filter(Boolean);
+          
+          const impactAreaArray: string[] = [];
+          impactAreaSources.forEach((source: any) => {
+            if (Array.isArray(source)) {
+              impactAreaArray.push(...source);
+            } else if (typeof source === 'string' && source.trim()) {
+              impactAreaArray.push(...source.split(',').map((i: string) => i.trim()).filter((i: string) => i.length > 0));
+            }
+          });
+          // 去重
+          const uniqueImpactArea = Array.from(new Set(impactAreaArray));
+          
+          return {
+            id: String(org.id || ''),
+            name: org.name || '',
+            expertise: expertiseArray,
+            // 支持 contactPerson 和 contact_person
+            contactPerson: org.contactPerson || org.contact_person || '',
+            // 支持 role 和 position
+            role: org.role || org.position || '',
+            // 支持 email 和 email_id
+            email: org.email || org.email_id || '',
+            phone: org.phone || '',
+            website: org.website || '',
+            // 支持 address 和 physical_address
+            address: org.address || org.physical_address || '',
+            // entityType 可能不存在，使用空字符串
+            entityType: org.entityType || org.entity_type || '',
+            impactArea: uniqueImpactArea,
+          };
+        });
+        
+        console.log('格式化後的數據:', formattedData);
+        console.log('格式化後的數據數量:', formattedData.length);
+        setOrganizations(formattedData);
+      } catch (err: any) {
+        console.error('獲取組織數據失敗:', err);
+        setError(err.message || '無法載入數據');
+        // 如果 API 失敗，使用模擬數據作為備用
+        setOrganizations(MOCK_DATA);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // 從組織數據中提取所有唯一的篩選選項
+  const filterOptions = useMemo(() => {
+    const expertiseSet = new Set<string>();
+    const entityTypeSet = new Set<string>();
+    const impactAreaSet = new Set<string>();
+
+    organizations.forEach(org => {
+      org.expertise?.forEach(exp => expertiseSet.add(exp));
+      if (org.entityType) entityTypeSet.add(org.entityType);
+      org.impactArea?.forEach(imp => impactAreaSet.add(imp));
+    });
+
+    return {
+      expertise: Array.from(expertiseSet).sort(),
+      entityType: Array.from(entityTypeSet).sort(),
+      impactArea: Array.from(impactAreaSet).sort(),
+    };
+  }, [organizations]);
 
   // Filtering Logic
   const filteredData = useMemo(() => {
-    return MOCK_DATA.filter(item => {
+    return organizations.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            item.contactPerson.toLowerCase().includes(searchQuery.toLowerCase());
       
@@ -113,7 +200,7 @@ export default function DatabasePage() {
 
       return matchesSearch && matchesExpertise && matchesEntity && matchesImpact;
     });
-  }, [searchQuery, selectedExpertise, selectedEntityType, selectedImpactArea]);
+  }, [organizations, searchQuery, selectedExpertise, selectedEntityType, selectedImpactArea]);
 
   return (
     <div className="pt-32 pb-24 bg-[#F9FAFB] min-h-screen">
@@ -138,19 +225,19 @@ export default function DatabasePage() {
         <div className="flex flex-wrap gap-4 mb-10">
           <FilterDropdown 
             label="Area of Expertise" 
-            options={FILTER_OPTIONS.expertise} 
+            options={filterOptions.expertise} 
             selected={selectedExpertise} 
             onChange={setSelectedExpertise} 
           />
           <FilterDropdown 
             label="Type of Entity" 
-            options={FILTER_OPTIONS.entityType} 
+            options={filterOptions.entityType} 
             selected={selectedEntityType} 
             onChange={setSelectedEntityType} 
           />
           <FilterDropdown 
             label="Impact Area" 
-            options={FILTER_OPTIONS.impactArea} 
+            options={filterOptions.impactArea} 
             selected={selectedImpactArea} 
             onChange={setSelectedImpactArea} 
           />
@@ -170,10 +257,28 @@ export default function DatabasePage() {
           )}
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-20 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-[#3B3469] mx-auto mb-4" />
+            <p className="text-gray-600">Loading data...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-3xl p-6 mb-6">
+            <p className="text-yellow-800 text-sm">
+              ⚠️ {error}。目前顯示備用數據。
+            </p>
+          </div>
+        )}
+
         {/* Results Table */}
-        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
+        {!isLoading && (
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1200px]">
               <thead>
                 <tr className="bg-white border-b border-gray-100 text-[#1E1B4B]/40 font-bold text-[10px] uppercase tracking-[0.1em]">
                   <th className="px-4 py-2 flex items-center gap-2"><Building2 className="w-3 h-3" /> Organisation Name</th>
@@ -234,6 +339,7 @@ export default function DatabasePage() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Opt Out CTA Section */}
