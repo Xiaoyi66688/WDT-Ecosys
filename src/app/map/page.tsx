@@ -2,15 +2,16 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { GoogleMap, useJsApiLoader, Marker, MarkerClusterer, InfoWindow } from "@react-google-maps/api";
-import { Search, ChevronDown, Check, X, MapPin } from "lucide-react";
+import { Search, ChevronDown, Check, X, MapPin, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { getMapMarkers, Organization } from "@/lib/xano-api";
 
 // =========================================================================
 // 【同事注意 / FOR COLLEAGUE】
 // 中文：你需要在这里填入真实的 Google Maps API Key。
 // English: You need to insert a real Google Maps API Key here.
 // =========================================================================
-const GOOGLE_MAPS_API_KEY = ""; // REPLACE WITH REAL KEY
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 // --- Types & Config ---
 const HAMILTON_CENTER = { lat: -37.787, lng: 175.279 }; // Hamilton, NZ
@@ -25,24 +26,31 @@ const TAGS = [
 
 const AOE_OPTIONS = ["Accounting", "Advocacy", "Agriculture", "AgriTech", "AI", "Animation", "Arts organisation", "Software Dev"];
 
-// =========================================================================
-// 【同事注意 / FOR COLLEAGUE】
-// 中文：这里是地图标记的模拟数据。正式上线时需要从 Airtable 或你的后端 API 获取这些带有经纬度坐标的数据。
-// English: This is mock data for markers. In production, fetch this data (with lat/lng coordinates) from Airtable or your backend API.
-// =========================================================================
+// 備用模擬數據（當 API 無法連接時使用）
 const MOCK_MARKERS = [
   { id: "1", name: "2degrees Hamilton", lat: -37.788, lng: 175.282, aoe: "Telecommunications", tags: ["Digital inclusion"] },
   { id: "2", name: "A1dezine Hamilton", lat: -37.782, lng: 175.275, aoe: "Software Dev", tags: ["Industry pathway"] },
   { id: "3", name: "AgriSmart HQ", lat: -37.795, lng: 175.290, aoe: "AgriTech", tags: ["Pastoral care"] },
   { id: "4", name: "Waikato Tech Hub", lat: -37.785, lng: 175.270, aoe: "AI", tags: ["Digital equity"] },
-  // ... more mock markers
 ];
+
+interface MapMarker {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  aoe: string;
+  tags: string[];
+}
 
 export default function MapPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeAoe, setActiveAoe] = useState<string[]>([]);
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
+  const [markers, setMarkers] = useState<MapMarker[]>([]);
+  const [isLoadingMarkers, setIsLoadingMarkers] = useState(true);
+  const [markerError, setMarkerError] = useState<string | null>(null);
 
   // Load Google Maps API
   const { isLoaded } = useJsApiLoader({
@@ -50,9 +58,81 @@ export default function MapPage() {
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
   });
 
+  // 從 Xano API 獲取地圖標記數據
+  useEffect(() => {
+    const fetchMarkers = async () => {
+      try {
+        setIsLoadingMarkers(true);
+        setMarkerError(null);
+        const data = await getMapMarkers();
+        
+        // 將 Xano 數據轉換為地圖標記格式
+        const formattedMarkers: MapMarker[] = data
+          .map((org: any) => {
+            // 支持多種經緯度字段格式
+            const lat = org.latitude || org.lat || (org as any).location?.latitude;
+            const lng = org.longitude || org.lng || (org as any).location?.longitude;
+            
+            // 轉換為數字
+            const latNum = lat ? Number(lat) : null;
+            const lngNum = lng ? Number(lng) : null;
+            
+            // 只處理有效的經緯度
+            if (!latNum || !lngNum || isNaN(latNum) || isNaN(lngNum)) {
+              return null;
+            }
+            
+            // 處理 expertise（可能是字符串或數組）
+            const expertise = org.expertise || '';
+            const expertiseArray = Array.isArray(expertise) 
+              ? expertise 
+              : (typeof expertise === 'string' && expertise.trim() 
+                  ? expertise.split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0)
+                  : []);
+            
+            // 處理 impactArea（可能是字符串或數組）
+            const impactArea = org.impactArea || org.impact_area || '';
+            const impactAreaArray = Array.isArray(impactArea)
+              ? impactArea
+              : (typeof impactArea === 'string' && impactArea.trim() 
+                  ? impactArea.split(',').map((i: string) => i.trim()).filter((i: string) => i.length > 0)
+                  : []);
+            
+            return {
+              id: String(org.id || ''),
+              name: org.name || '',
+              lat: latNum,
+              lng: lngNum,
+              aoe: expertiseArray[0] || '',
+              tags: impactAreaArray,
+            };
+          })
+          .filter((marker): marker is MapMarker => marker !== null);
+        
+        setMarkers(formattedMarkers);
+      } catch (error: any) {
+        console.error('獲取地圖標記失敗:', error);
+        const errorMessage = error.message || '無法載入地圖標記';
+        setMarkerError(errorMessage);
+        
+        // 如果是速率限制錯誤，顯示更友好的訊息
+        if (errorMessage.includes('速率限制') || errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+          setMarkerError('API 請求過於頻繁，請稍後再試。目前使用模擬數據顯示。');
+        }
+        
+        // 如果 API 失敗，使用模擬數據作為備用
+        setMarkers(MOCK_MARKERS);
+      } finally {
+        setIsLoadingMarkers(false);
+      }
+    };
+
+    fetchMarkers();
+  }, []);
+
   // Filter Logic
   const filteredMarkers = useMemo(() => {
-    return MOCK_MARKERS.filter(m => {
+    return markers.filter(m => {
       const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesAoe = activeAoe.length === 0 || activeAoe.includes(m.aoe);
       const matchesTag = activeTags.length === 0 || m.tags.some(t => activeTags.includes(t));

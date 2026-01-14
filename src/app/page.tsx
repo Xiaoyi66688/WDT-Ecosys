@@ -4,8 +4,31 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Mail, MapPin, AtSign } from "lucide-react";
+import { getEcosystemStats } from "@/lib/xano-api";
 
 export default function Home() {
+  // Statistics State
+  const [stats, setStats] = useState({
+    totalEntities: 300,
+    totalExpertise: 100,
+    totalRegions: 1,
+  });
+
+  // 從 Xano API 獲取統計數據
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await getEcosystemStats();
+        setStats(data);
+      } catch (error) {
+        console.error('獲取統計數據失敗:', error);
+        // 如果 API 失敗，使用默認值
+      }
+    };
+
+    fetchStats();
+  }, []);
+
   // Slider State
   const [currentSlide, setCurrentSlide] = useState(0);
   const sliderImages = [
@@ -98,27 +121,22 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-[#3B3469] text-3xl font-bold mb-20 tracking-tight">Ecosystem Overview</h2>
           <div className="grid md:grid-cols-3 gap-16 max-w-5xl mx-auto">
-            {/* =========================================================================
-                【同事注意 / FOR COLLEAGUE】
-                中文：下方的数字（300+, 100+, 1）建议替换为从 Airtable 动态统计的数据。
-                English: The numbers below (300+, 100+, 1) should be replaced with dynamic counts from Airtable.
-                ========================================================================= */}
             <div className="space-y-6">
-              <div className="text-7xl font-bold text-[#C4BCEE]">300+</div>
+              <div className="text-7xl font-bold text-[#C4BCEE]">{stats.totalEntities > 0 ? `${stats.totalEntities}+` : '300+'}</div>
               <div className="space-y-2">
                 <div className="font-bold text-[#3B3469] uppercase tracking-[0.2em] text-sm">Entities</div>
                 <p className="text-sm text-[#1E1B4B] font-medium leading-relaxed">Number of businesses, organisations & initiatives.</p>
               </div>
             </div>
             <div className="space-y-6">
-              <div className="text-7xl font-bold text-[#C4BCEE]">100+</div>
+              <div className="text-7xl font-bold text-[#C4BCEE]">{stats.totalExpertise > 0 ? `${stats.totalExpertise}+` : '100+'}</div>
               <div className="space-y-2">
                 <div className="font-bold text-[#3B3469] uppercase tracking-[0.2em] text-sm">AoE</div>
-                <p className="text-sm text-[#1E1B4B] font-medium leading-relaxed">Over 100+ Areas of Expertise represented.</p>
+                <p className="text-sm text-[#1E1B4B] font-medium leading-relaxed">Over {stats.totalExpertise > 0 ? stats.totalExpertise : 100}+ Areas of Expertise represented.</p>
               </div>
             </div>
             <div className="space-y-6">
-              <div className="text-7xl font-bold text-[#C4BCEE]">1</div>
+              <div className="text-7xl font-bold text-[#C4BCEE]">{stats.totalRegions}</div>
               <div className="space-y-2">
                 <div className="font-bold text-[#3B3469] uppercase tracking-[0.2em] text-sm">One Region</div>
                 <p className="text-sm text-[#1E1B4B] font-medium leading-relaxed">The mighty Waikato region!</p>
