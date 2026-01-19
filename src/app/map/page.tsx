@@ -38,6 +38,16 @@ const MOCK_MARKERS = [
   // ... more mock markers
 ];
 
+// =========================================================================
+// 【同事注意 / FOR COLLEAGUE】
+// 中文：你需要在这里编写逻辑来处理从 Database 页面传过来的地址参数。
+// 你可以使用 useSearchParams 钩子获取 URL 中的 address 或 id，
+// 然后自动在地图上定位到该标记并打开 InfoWindow。
+// English: You need to implement logic here to handle the address parameters from the Database page.
+// Use the 'useSearchParams' hook to get 'address' or 'id' from the URL, 
+// then auto-center the map on that marker and open its InfoWindow.
+// =========================================================================
+
 export default function MapPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeAoe, setActiveAoe] = useState<string[]>([]);

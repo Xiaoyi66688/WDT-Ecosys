@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, Check, ExternalLink, Mail, Phone, MapPin, X, Building2, Zap, Users } from "lucide-react";
+import { Search, ChevronDown, Check, ExternalLink, X } from "lucide-react";
 
 // --- Mock Data Types ---
 interface Org {
@@ -119,7 +119,7 @@ export default function DatabasePage() {
     <div className="pt-32 pb-24 bg-[#F9FAFB] min-h-screen">
       <div className="container mx-auto px-4 max-w-[1400px]">
         <div className="text-center mb-12">
-          <h1 className="text-[#3B3469] text-3xl font-extrabold tracking-tight mb-8">Ecosystem Database</h1>
+          <h1 className="text-[#3B3469] text-3xl font-extrabold tracking-tight mb-8">Ecosystem Directory</h1>
           
           {/* Search Bar */}
           <div className="max-w-4xl mx-auto relative group">
@@ -175,15 +175,15 @@ export default function DatabasePage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[1200px]">
               <thead>
-                <tr className="bg-white border-b border-gray-100 text-[#1E1B4B]/40 font-bold text-[10px] uppercase tracking-[0.1em]">
-                  <th className="px-4 py-2 flex items-center gap-2"><Building2 className="w-3 h-3" /> Organisation Name</th>
-                  <th className="px-4 py-2"><Zap className="w-3 h-3 inline mr-1.5" /> Expertise</th>
-                  <th className="px-4 py-2"><Users className="w-3 h-3 inline mr-1.5" /> Contact Person</th>
-                  <th className="px-4 py-2"><X className="w-3 h-3 inline mr-1.5 rotate-45" /> Title/role</th>
-                  <th className="px-4 py-2"><Mail className="w-3 h-3 inline mr-1.5" /> Email</th>
-                  <th className="px-4 py-2"><Phone className="w-3 h-3 inline mr-1.5" /> Contact - Phone</th>
-                  <th className="px-4 py-2"><ExternalLink className="w-3 h-3 inline mr-1.5" /> Website</th>
-                  <th className="px-4 py-2"><MapPin className="w-3 h-3 inline mr-1.5" /> Address</th>
+                <tr className="bg-white border-b border-gray-100 text-[#1E1B4B] font-bold text-[10px] uppercase tracking-[0.1em]">
+                  <th className="px-4 py-4">Organisation Name</th>
+                  <th className="px-4 py-4">Expertise</th>
+                  <th className="px-4 py-4">Contact Person</th>
+                  <th className="px-4 py-4">Title/role</th>
+                  <th className="px-4 py-4">Email</th>
+                  <th className="px-4 py-4">Contact - Phone</th>
+                  <th className="px-4 py-4">Website</th>
+                  <th className="px-4 py-4">Address</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -222,7 +222,22 @@ export default function DatabasePage() {
                         </a>
                       ) : "-"}
                     </td>
-                    <td className="px-4 py-1.5 text-[10px] text-gray-400 leading-tight max-w-[180px]">{item.address}</td>
+                    <td className="px-4 py-1.5 text-[10px] text-gray-400 leading-tight max-w-[180px]">
+                      <Link 
+                        href={`/map?address=${encodeURIComponent(item.address)}&id=${item.id}`}
+                        className="hover:text-[#3B3469] hover:underline transition-colors"
+                      >
+                        {item.address}
+                      </Link>
+                      {/* =========================================================================
+                          【同事注意 / FOR COLLEAGUE】
+                          中文：点击地址会跳转到地图页面。你需要在地图页面 (/map) 编写逻辑，
+                          根据 URL 中的 address 或 id 参数，自动定位并弹出该组织的标记。
+                          English: Clicking the address links to the map page. You need to implement 
+                          logic in the map page (/map) to auto-center and open the info window 
+                          based on the 'address' or 'id' URL parameter.
+                          ========================================================================= */}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -250,7 +265,7 @@ export default function DatabasePage() {
               href="/opt-out" 
               className="bg-[#3B3469] text-white px-10 py-4 rounded-full font-bold hover:bg-[#2D2852] transition-all whitespace-nowrap shadow-lg"
             >
-              Opt Out Now!
+              Opt Out Now
             </Link>
           </div>
         </div>

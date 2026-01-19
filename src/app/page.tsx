@@ -46,7 +46,7 @@ export default function Home() {
               Ecosystem
             </h1>
             <p className="text-xl opacity-90 max-w-lg leading-relaxed font-medium">
-              Explore the database and find Waikato businesses & organisations on our map.
+              Explore the directory and find Waikato businesses & organisations on our map.
             </p>
             <Link 
               href="/database" 
